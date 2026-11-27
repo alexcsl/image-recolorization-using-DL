@@ -1,0 +1,27 @@
+{
+  "source": "MS COCO 2017 (train2017)",
+  "total_pool_size": 118287,
+  "images_inspected": 12504,
+  "grayscale_filtered_out": 467,
+  "failed_downloads": 0,
+  "final_dataset_size": 12000,
+  "image_size": 256,
+  "seed": 42,
+  "splits": {
+    "train": 9600,
+    "val": 1200,
+    "test": 1200
+  },
+  "eda": {
+    "L_mean": 47.4,
+    "L_std": 26.73,
+    "a_mean": 2.16,
+    "a_std": 11.33,
+    "b_mean": 6.85,
+    "b_std": 17.22,
+    "orig_width_median": 640,
+    "orig_height_median": 480,
+    "eda_plot": "results\\plots\\dataset_eda.png",
+    "samples_plot": "results\\plots\\dataset_samples.png"
+  }
+}
