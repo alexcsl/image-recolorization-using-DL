@@ -19,7 +19,7 @@ Automatic image colorization predicts plausible, natural colors for grayscale ph
 │   ├── baseline.yaml               # Simple CNN Autoencoder (MSE, Adam, lr=2e-4, bs=16, 30ep)
 │   ├── e1_lr_1e3.yaml              # E1: Learning rate ablation (lr=1e-3)
 │   ├── e2_unet_resnet18.yaml       # E2: U-Net + Pretrained ResNet-18 Encoder (L1 loss)
-│   ├── e3_unet_adamw.yaml          # E3 (Ready): U-Net ResNet-18 with AdamW
+│   ├── e3_unet_weight_decay.yaml   # E3: E2 with weight decay 1e-4
 │   └── e4_unet_bs32.yaml           # E4 (Ready): U-Net ResNet-18 with batch_size=32
 ├── data/
 │   └── splits/                     # Committed reproducible manifests (train/val/test.csv)
@@ -101,7 +101,7 @@ python -m src.evaluate --configs configs/baseline.yaml configs/e1_lr_1e3.yaml co
 | Baseline | None | CNN autoencoder, MSE, Adam, learning rate 0.0002, batch size 16 | Establish a reference for chrominance regression |
 | E1 | Baseline | Learning rate 0.001 | Measure sensitivity to larger updates |
 | E2 | Baseline | Pretrained ResNet-18 U-Net and L1 loss | Benchmark the proposed method as a package |
-| E3 | E2 | AdamW optimizer with weight decay held at zero | Compare optimizers with other settings fixed |
+| E3 | E2 | Weight decay 0.0001 | Measure the effect of L2 regularization in Adam |
 | E4 | E2 | Batch size 32 | Measure the effect of averaging gradients over more images |
 
 All runs use the same train, validation, and test manifests. The three single-variable experiments are E1, E3, and E4. E2 is a combined benchmark and cannot isolate the effect of its architecture or loss.
@@ -129,7 +129,7 @@ python -m src.evaluate --configs baseline.yaml e1_lr_1e3.yaml
 ## Team Git Workflow
 1. Always create a feature branch for new experiments or models:
    ```bash
-   git checkout -b exp/e3-adamw
+   git checkout -b exp/e3-weight-decay
    ```
 2. Add a new YAML file in `configs/` changing **only one variable** per scenario.
 3. Run `python -m src.train --config configs/<your_config>.yaml`.

@@ -1,5 +1,5 @@
-experiment_name: e3_unet_adamw
-description: "E3: E2 with AdamW instead of Adam, holding weight decay at zero"
+experiment_name: e3_unet_weight_decay
+description: "E3: E2 with Adam weight decay set to 1e-4"
 seed: 42
 
 data:
@@ -16,9 +16,9 @@ model:
 training:
   epochs: 30
   batch_size: 16
-  optimizer: adamw
+  optimizer: adam
   lr: 2.0e-4
-  weight_decay: 0.0
+  weight_decay: 1.0e-4
   loss: l1
   use_amp: true
   num_visual_samples: 8
