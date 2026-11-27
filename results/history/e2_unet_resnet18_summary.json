@@ -1,0 +1,20 @@
+{
+  "experiment_name": "e2_unet_resnet18",
+  "model": "unet_resnet18",
+  "loss_fn": "l1",
+  "optimizer": "adam",
+  "lr": 0.0002,
+  "batch_size": 16,
+  "epochs": 30,
+  "best_epoch": 8,
+  "total_params": 14407586,
+  "trainable_params": 14407586,
+  "train_time_sec": 2412.8,
+  "train_time_min": 40.21,
+  "final_train_loss": 0.04318,
+  "best_val_loss": 0.063798,
+  "test_loss": 0.062648,
+  "test_psnr": 24.299,
+  "test_ssim": 0.94,
+  "test_lpips": 0.1681
+}

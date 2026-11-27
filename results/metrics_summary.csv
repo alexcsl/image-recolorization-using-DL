@@ -1,0 +1,4 @@
+experiment_name,model,loss_fn,optimizer,lr,batch_size,epochs,best_epoch,total_params,trainable_params,train_time_sec,train_time_min,final_train_loss,best_val_loss,test_loss,test_psnr,test_ssim,test_lpips
+baseline_cnn_ae,baseline_ae,mse,adam,0.0002,16,30,23,13901506,13901506,1161.0,19.35,0.009969,0.010675,0.010399,23.52,0.9263,0.1827
+e1_baseline_lr_1e3,baseline_ae,mse,adam,0.001,16,30,28,13901506,13901506,1102.3,18.37,0.010291,0.010827,0.010443,23.509,0.9308,0.1848
+e2_unet_resnet18,unet_resnet18,l1,adam,0.0002,16,30,8,14407586,14407586,2412.8,40.21,0.04318,0.063798,0.062648,24.299,0.94,0.1681
