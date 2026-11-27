@@ -45,36 +45,38 @@ def plot_curves(exp_names: List[str], labels: List[str], history_dir: Path, plot
     plt.savefig(plot_dir / "train_val_loss_curves.png", dpi=160)
     plt.close(fig)
 
-    # 2. Validation Metric Progression (PSNR, SSIM, LPIPS) across experiments
+    # 2. Metric progression across experiments
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.3))
     colors = ["#4A5568", "#DD6B20", "#2F855A", "#3182CE", "#805AD5"]
 
     for i, (exp, lbl) in enumerate(zip(exp_names, labels)):
         df = pd.read_csv(history_dir / f"{exp}_history.csv").dropna(subset=["val_psnr"])
         c = colors[i % len(colors)]
-        axes[0].plot(df["epoch"], df["val_psnr"], marker="o", label=lbl, color=c, linewidth=2)
-        axes[1].plot(df["epoch"], df["val_ssim"], marker="o", label=lbl, color=c, linewidth=2)
-        axes[2].plot(df["epoch"], df["val_lpips"], marker="o", label=lbl, color=c, linewidth=2)
+        for ax, metric in zip(axes, ("psnr", "ssim", "lpips")):
+            ax.plot(df["epoch"], df[f"val_{metric}"], marker="o", label=f"{lbl} val", color=c)
+            if f"train_{metric}" in df:
+                ax.plot(df["epoch"], df[f"train_{metric}"], marker=".", linestyle="--",
+                        label=f"{lbl} train sample", color=c)
 
-    axes[0].set_title("Validation PSNR (dB) ↑")
+    axes[0].set_title("PSNR (dB) ↑")
     axes[0].set_xlabel("Epoch")
     axes[0].set_ylabel("PSNR (dB)")
     axes[0].grid(True, alpha=0.3)
     axes[0].legend(fontsize=8)
 
-    axes[1].set_title("Validation SSIM ↑")
+    axes[1].set_title("SSIM ↑")
     axes[1].set_xlabel("Epoch")
     axes[1].set_ylabel("SSIM")
     axes[1].grid(True, alpha=0.3)
     axes[1].legend(fontsize=8)
 
-    axes[2].set_title("Validation LPIPS ↓ (Lower is Better)")
+    axes[2].set_title("LPIPS ↓")
     axes[2].set_xlabel("Epoch")
     axes[2].set_ylabel("LPIPS")
     axes[2].grid(True, alpha=0.3)
     axes[2].legend(fontsize=8)
 
-    plt.suptitle("Validation Metrics Across Experiments (Same 12k COCO Split)", fontsize=13)
+    plt.suptitle("Training Sample and Validation Metrics", fontsize=13)
     plt.tight_layout()
     plt.savefig(plot_dir / "val_metrics_comparison.png", dpi=160)
     plt.close(fig)

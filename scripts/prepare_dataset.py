@@ -58,6 +58,12 @@ def download_file(url: str, dest: Path) -> None:
 
 
 def load_coco_train2017_metadata(data_dir: Path) -> List[Dict[str, Any]]:
+    images_json = data_dir / "annotations" / "train2017_images.json"
+    if images_json.exists():
+        print(f"[INFO] Loading {images_json} ...")
+        with images_json.open(encoding="utf-8") as f:
+            return json.load(f)
+
     json_path = data_dir / "annotations" / "instances_train2017.json"
     if not json_path.exists():
         zip_path = data_dir / "annotations_trainval2017.zip"

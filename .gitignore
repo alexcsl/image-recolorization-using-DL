@@ -19,6 +19,7 @@ data/processed/
 data/processed_256/
 data/*.zip
 data/*.zip.part
+data/*.parquet
 data/annotations/
 
 # Model checkpoints (large binary weights)

@@ -7,6 +7,7 @@ Usage:
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any, Dict
@@ -15,7 +16,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 import yaml
 
 from src.dataset import ColorizationDataset
@@ -128,6 +129,8 @@ def main() -> None:
     img_dir = Path(data_cfg["processed_dir"])
     img_size = int(data_cfg.get("image_size", 256))
     num_workers = int(data_cfg.get("num_workers", 4))
+    if os.name == "nt":
+        num_workers = min(num_workers, 2)
     batch_size = int(train_cfg["batch_size"])
 
     train_ds = ColorizationDataset(splits_dir / "train.csv", img_dir, img_size, augment=True)
@@ -148,15 +151,21 @@ def main() -> None:
         val_ds,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=num_workers,
         pin_memory=pin,
-        persistent_workers=num_workers > 0,
+    )
+    train_eval_ds = ColorizationDataset(splits_dir / "train.csv", img_dir, img_size)
+    sample_rng = np.random.default_rng(int(cfg.get("seed", 42)))
+    sample_indices = sample_rng.choice(len(train_eval_ds), min(256, len(train_eval_ds)), replace=False)
+    train_eval_loader = DataLoader(
+        Subset(train_eval_ds, sample_indices.tolist()),
+        batch_size=batch_size,
+        pin_memory=pin,
+        generator=torch.Generator().manual_seed(int(cfg.get("seed", 42))),
     )
     test_loader = DataLoader(
         test_ds,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=num_workers,
         pin_memory=pin,
     )
 
@@ -230,6 +239,11 @@ def main() -> None:
             evaluator=evaluator if compute_val_metrics else None,
             use_amp=use_amp,
         )
+        train_metrics = (
+            evaluate_loader(model, train_eval_loader, criterion, device, evaluator, use_amp)
+            if compute_val_metrics
+            else {}
+        )
         ep_time = time.perf_counter() - ep_start
 
         if val_res["loss"] < best_val_loss:
@@ -252,6 +266,9 @@ def main() -> None:
             "val_psnr": round(val_res["psnr"], 4) if "psnr" in val_res else np.nan,
             "val_ssim": round(val_res["ssim"], 4) if "ssim" in val_res else np.nan,
             "val_lpips": round(val_res["lpips"], 4) if "lpips" in val_res else np.nan,
+            "train_psnr": round(train_metrics.get("psnr", np.nan), 4),
+            "train_ssim": round(train_metrics.get("ssim", np.nan), 4),
+            "train_lpips": round(train_metrics.get("lpips", np.nan), 4),
             "epoch_time_sec": round(ep_time, 2),
         }
         history.append(rec)
