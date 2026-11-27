@@ -1,0 +1,20 @@
+{
+  "experiment_name": "baseline_cnn_ae",
+  "model": "baseline_ae",
+  "loss_fn": "mse",
+  "optimizer": "adam",
+  "lr": 0.0002,
+  "batch_size": 16,
+  "epochs": 5,
+  "best_epoch": 1,
+  "total_params": 13901506,
+  "trainable_params": 13901506,
+  "train_time_sec": 68.5,
+  "train_time_min": 1.14,
+  "final_train_loss": 0.014771,
+  "best_val_loss": 0.014311,
+  "test_loss": 0.011582,
+  "test_psnr": 23.721,
+  "test_ssim": 0.9205,
+  "test_lpips": 0.2086
+}

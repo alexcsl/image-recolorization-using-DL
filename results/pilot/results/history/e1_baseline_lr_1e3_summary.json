@@ -1,0 +1,20 @@
+{
+  "experiment_name": "e1_baseline_lr_1e3",
+  "model": "baseline_ae",
+  "loss_fn": "mse",
+  "optimizer": "adam",
+  "lr": 0.001,
+  "batch_size": 16,
+  "epochs": 5,
+  "best_epoch": 5,
+  "total_params": 13901506,
+  "trainable_params": 13901506,
+  "train_time_sec": 62.1,
+  "train_time_min": 1.04,
+  "final_train_loss": 0.014359,
+  "best_val_loss": 0.014427,
+  "test_loss": 0.011708,
+  "test_psnr": 23.733,
+  "test_ssim": 0.9117,
+  "test_lpips": 0.2094
+}

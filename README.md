@@ -106,6 +106,26 @@ python -m src.evaluate --configs configs/baseline.yaml configs/e1_lr_1e3.yaml co
 
 All runs use the same train, validation, and test manifests. The three single-variable experiments are E1, E3, and E4. E2 is a combined benchmark and cannot isolate the effect of its architecture or loss.
 
+## Initial Pilot
+
+Baseline and E1 completed five epochs on a shared 1,200-image COCO split (960 train, 120 validation, 120 test). The [pilot metrics](results/pilot/results/metrics_summary.csv), [loss curves](results/pilot/results/plots/train_val_loss_curves.png), and [metric curves](results/pilot/results/plots/val_metrics_comparison.png) document this smaller run. The main experiment configurations use 12,000 images and 30 epochs.
+
+To download the exact pilot images from the repository root:
+
+```bash
+python scripts/prepare_dataset.py --from-splits --splits-dir results/pilot/splits
+```
+
+Run the pilot from `results/pilot` with the repository root on `PYTHONPATH`:
+
+```powershell
+cd results/pilot
+$env:PYTHONPATH = (Resolve-Path ../..).Path
+python -m src.train --config baseline.yaml
+python -m src.train --config e1_lr_1e3.yaml
+python -m src.evaluate --configs baseline.yaml e1_lr_1e3.yaml
+```
+
 ## Team Git Workflow
 1. Always create a feature branch for new experiments or models:
    ```bash
