@@ -1,0 +1,24 @@
+experiment_name: e3_unet_adamw
+description: "E3: E2 with AdamW instead of Adam, holding weight decay at zero"
+seed: 42
+
+data:
+  processed_dir: data/processed_256
+  splits_dir: data/splits
+  image_size: 256
+  num_workers: 4
+
+model:
+  name: unet_resnet18
+  pretrained: true
+  freeze_encoder_epochs: 0
+
+training:
+  epochs: 30
+  batch_size: 16
+  optimizer: adamw
+  lr: 2.0e-4
+  weight_decay: 0.0
+  loss: l1
+  use_amp: true
+  num_visual_samples: 8

@@ -1,0 +1,23 @@
+experiment_name: baseline_cnn_ae
+description: "Baseline: Simple CNN Autoencoder without skip connections or pretrained weights (MSE loss, Adam, lr=2e-4, bs=16, 30 epochs)"
+seed: 42
+
+data:
+  processed_dir: data/processed_256
+  splits_dir: data/splits
+  image_size: 256
+  num_workers: 4
+
+model:
+  name: baseline_ae
+  base_channels: 64
+
+training:
+  epochs: 30
+  batch_size: 16
+  optimizer: adam
+  lr: 2.0e-4
+  weight_decay: 0.0
+  loss: mse
+  use_amp: true
+  num_visual_samples: 8

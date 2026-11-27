@@ -1,0 +1,26 @@
+# Core Deep Learning (install CUDA build on GPU machines:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124)
+torch>=2.4.0
+torchvision>=0.19.0
+
+# Image Processing & Color Space
+numpy>=1.26.0
+Pillow>=10.0.0
+opencv-python-headless>=4.9.0
+scikit-image>=0.22.0
+
+# Evaluation Metrics
+lpips>=0.1.4
+
+# Data & Visualization
+pandas>=2.1.0
+matplotlib>=3.8.0
+tqdm>=4.66.0
+PyYAML>=6.0.1
+requests>=2.31.0
+
+# Notebooks
+jupyter>=1.0.0
+ipykernel>=6.29.0
+nbformat>=5.10.0
+nbconvert>=7.16.0

@@ -1,0 +1,23 @@
+experiment_name: e1_baseline_lr_1e3
+description: "E1 (Scenario 1): Baseline CNN Autoencoder with learning rate changed from 2e-4 to 1e-3 (single-variable ablation)"
+seed: 42
+
+data:
+  processed_dir: data/processed_256
+  splits_dir: data/splits
+  image_size: 256
+  num_workers: 4
+
+model:
+  name: baseline_ae
+  base_channels: 64
+
+training:
+  epochs: 30
+  batch_size: 16
+  optimizer: adam
+  lr: 1.0e-3
+  weight_decay: 0.0
+  loss: mse
+  use_amp: true
+  num_visual_samples: 8
