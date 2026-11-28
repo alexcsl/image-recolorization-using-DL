@@ -1,3 +1,5 @@
+"""PyTorch dataset that turns color photos into (L input, ab target) pairs."""
+
 from pathlib import Path
 from typing import Tuple
 

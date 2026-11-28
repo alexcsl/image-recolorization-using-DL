@@ -1,15 +1,22 @@
 """
-Generate Comparison Plots & Visual Colorization Grids Across Experiments.
+Compare finished experiments with plots and a side-by-side colorization grid.
+
+Reads `results/history/<experiment>_history.csv` and `checkpoints/<experiment>_best.pt` for every
+config and writes:
+  - results/plots/train_val_loss_curves.png    train vs. validation loss per experiment
+  - results/plots/val_metrics_comparison.png   PSNR / SSIM / LPIPS over epochs
+  - results/samples/comparison_grid.png        the same test images colorized by every model
 
 Usage:
-  python -m src.evaluate --configs configs/baseline.yaml configs/e1_lr_1e3.yaml configs/e2_unet_resnet18.yaml
+    python -m src.evaluate --configs configs/baseline.yaml configs/e2_unet_resnet18.yaml configs/m3_palette.yaml
 """
 
 import argparse
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,20 +28,34 @@ from src.dataset import ColorizationDataset
 from src.models import build_model
 from src.utils import lab_normalized_to_rgb
 
+HISTORY_DIR = Path("results/history")
+PLOT_DIR = Path("results/plots")
+GRID_PATH = Path("results/samples/comparison_grid.png")
+CHECKPOINT_DIR = Path("checkpoints")
 
-def plot_curves(exp_names: List[str], labels: List[str], history_dir: Path, plot_dir: Path) -> None:
-    plot_dir.mkdir(parents=True, exist_ok=True)
+COLORS = ["#4A5568", "#DD6B20", "#2F855A", "#3182CE", "#805AD5"]
+METRICS = [("psnr", "PSNR (dB) ↑", "PSNR (dB)"), ("ssim", "SSIM ↑", "SSIM"), ("lpips", "LPIPS ↓", "LPIPS")]
 
-    # 1. Per-experiment Train vs Val Loss (clearly shows overfitting / underfitting / stability)
+
+def load_yaml(path: Path) -> Dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+# ---------------------------------------------------------------------------
+# Curves
+# ---------------------------------------------------------------------------
+
+def plot_loss_curves(exp_names: List[str], labels: List[str]) -> None:
+    """One panel per experiment: a growing gap between train and val loss means overfitting."""
     fig, axes = plt.subplots(1, len(exp_names), figsize=(5.5 * len(exp_names), 4.2))
-    if len(exp_names) == 1:
-        axes = [axes]
+    axes = np.atleast_1d(axes)
 
-    for ax, exp, lbl in zip(axes, exp_names, labels):
-        df = pd.read_csv(history_dir / f"{exp}_history.csv")
-        ax.plot(df["epoch"], df["train_loss"], label="Train Loss", linewidth=2, color="#2B6CB0")
-        ax.plot(df["epoch"], df["val_loss"], label="Val Loss", linewidth=2, color="#E53E3E", linestyle="--")
-        ax.set_title(lbl, fontsize=11)
+    for ax, exp, label in zip(axes, exp_names, labels):
+        history = pd.read_csv(HISTORY_DIR / f"{exp}_history.csv")
+        ax.plot(history["epoch"], history["train_loss"], label="Train Loss", linewidth=2, color="#2B6CB0")
+        ax.plot(history["epoch"], history["val_loss"], label="Val Loss", linewidth=2, color="#E53E3E", linestyle="--")
+        ax.set_title(label, fontsize=11)
         ax.set_xlabel("Epoch")
         ax.set_ylabel("Loss")
         ax.grid(True, alpha=0.3)
@@ -42,100 +63,96 @@ def plot_curves(exp_names: List[str], labels: List[str], history_dir: Path, plot
 
     plt.suptitle("Training vs. Validation Loss Curves", fontsize=13)
     plt.tight_layout()
-    plt.savefig(plot_dir / "train_val_loss_curves.png", dpi=160)
+    plt.savefig(PLOT_DIR / "train_val_loss_curves.png", dpi=160)
     plt.close(fig)
 
-    # 2. Metric progression across experiments
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.3))
-    colors = ["#4A5568", "#DD6B20", "#2F855A", "#3182CE", "#805AD5"]
 
-    for i, (exp, lbl) in enumerate(zip(exp_names, labels)):
-        df = pd.read_csv(history_dir / f"{exp}_history.csv").dropna(subset=["val_psnr"])
-        c = colors[i % len(colors)]
-        for ax, metric in zip(axes, ("psnr", "ssim", "lpips")):
-            ax.plot(df["epoch"], df[f"val_{metric}"], marker="o", label=f"{lbl} val", color=c)
-            if f"train_{metric}" in df:
-                ax.plot(df["epoch"], df[f"train_{metric}"], marker=".", linestyle="--",
-                        label=f"{lbl} train sample", color=c)
+def plot_metric_curves(exp_names: List[str], labels: List[str]) -> None:
+    """PSNR, SSIM, and LPIPS over epochs for all experiments (validation solid, train sample dashed)."""
+    fig, axes = plt.subplots(1, len(METRICS), figsize=(15, 4.3))
 
-    axes[0].set_title("PSNR (dB) ↑")
-    axes[0].set_xlabel("Epoch")
-    axes[0].set_ylabel("PSNR (dB)")
-    axes[0].grid(True, alpha=0.3)
-    axes[0].legend(fontsize=8)
+    for i, (exp, label) in enumerate(zip(exp_names, labels)):
+        history = pd.read_csv(HISTORY_DIR / f"{exp}_history.csv").dropna(subset=["val_psnr"])
+        color = COLORS[i % len(COLORS)]
+        for ax, (metric, _, _) in zip(axes, METRICS):
+            ax.plot(history["epoch"], history[f"val_{metric}"], marker="o", label=f"{label} val", color=color)
+            if f"train_{metric}" in history:
+                ax.plot(history["epoch"], history[f"train_{metric}"], marker=".", linestyle="--",
+                        label=f"{label} train sample", color=color)
 
-    axes[1].set_title("SSIM ↑")
-    axes[1].set_xlabel("Epoch")
-    axes[1].set_ylabel("SSIM")
-    axes[1].grid(True, alpha=0.3)
-    axes[1].legend(fontsize=8)
-
-    axes[2].set_title("LPIPS ↓")
-    axes[2].set_xlabel("Epoch")
-    axes[2].set_ylabel("LPIPS")
-    axes[2].grid(True, alpha=0.3)
-    axes[2].legend(fontsize=8)
+    for ax, (_, title, ylabel) in zip(axes, METRICS):
+        ax.set_title(title)
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel(ylabel)
+        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=8)
 
     plt.suptitle("Training Sample and Validation Metrics", fontsize=13)
     plt.tight_layout()
-    plt.savefig(plot_dir / "val_metrics_comparison.png", dpi=160)
+    plt.savefig(PLOT_DIR / "val_metrics_comparison.png", dpi=160)
     plt.close(fig)
 
 
+# ---------------------------------------------------------------------------
+# Qualitative grid
+# ---------------------------------------------------------------------------
+
+def load_trained_model(cfg: Dict[str, Any], device: torch.device) -> torch.nn.Module:
+    model = build_model(cfg["model"]).to(device)
+    checkpoint = torch.load(CHECKPOINT_DIR / f"{cfg['experiment_name']}_best.pt", map_location=device, weights_only=False)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    return model.eval()
+
+
 @torch.no_grad()
-def plot_visual_comparison(
-    config_paths: List[Path],
-    labels: List[str],
-    out_path: Path,
-    num_samples: int = 6,
-) -> None:
+def colorize(model: torch.nn.Module, L: torch.Tensor, seed: int = 42) -> torch.Tensor:
+    """Predict ab for a batch of L. Diffusion models use a fixed seed so the result is repeatable."""
+    if getattr(model, "is_diffusion", False):
+        return model(L, generator=torch.Generator(device=L.device).manual_seed(seed))
+    return model(L)
+
+
+@torch.no_grad()
+def plot_visual_comparison(config_paths: List[Path], labels: List[str], out_path: Path, num_samples: int = 6) -> None:
+    """Rows are test images; columns are grayscale input, every model's output, and the ground truth."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    configs = [load_yaml(p) for p in config_paths]
 
-    with open(config_paths[0], "r", encoding="utf-8") as f:
-        first_cfg = yaml.safe_load(f)
-
+    data_cfg = configs[0]["data"]
     test_ds = ColorizationDataset(
-        Path(first_cfg["data"]["splits_dir"]) / "test.csv",
-        Path(first_cfg["data"]["processed_dir"]),
-        int(first_cfg["data"].get("image_size", 256)),
+        Path(data_cfg["splits_dir"]) / "test.csv",
+        Path(data_cfg["processed_dir"]),
+        int(data_cfg.get("image_size", 256)),
         augment=False,
     )
 
-    # Pick evenly spaced indices from test set for diverse scenes
+    # Evenly spaced test images give a variety of scenes.
     indices = np.linspace(0, len(test_ds) - 1, num_samples, dtype=int)
-    L_batch = torch.stack([test_ds[i][0] for i in indices]).to(device)
-    ab_gt_batch = torch.stack([test_ds[i][1] for i in indices]).to(device)
+    L = torch.stack([test_ds[i][0] for i in indices]).to(device)
+    ab_true = torch.stack([test_ds[i][1] for i in indices]).to(device)
 
-    gt_rgb = lab_normalized_to_rgb(L_batch, ab_gt_batch)
-    gray_rgb = ((L_batch.cpu().numpy()[:, 0] + 1.0) * 0.5).clip(0.0, 1.0)
+    gray = ((L.cpu().numpy()[:, 0] + 1.0) * 0.5).clip(0.0, 1.0)
+    ground_truth = lab_normalized_to_rgb(L, ab_true)
+    predictions = [
+        lab_normalized_to_rgb(L, colorize(load_trained_model(cfg, device), L, int(cfg.get("seed", 42))))
+        for cfg in configs
+    ]
 
-    preds_per_model = []
-    for cfg_path in config_paths:
-        with open(cfg_path, "r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f)
-        exp_name = cfg["experiment_name"]
-        model = build_model(cfg["model"]).to(device)
-        ckpt = torch.load(f"checkpoints/{exp_name}_best.pt", map_location=device, weights_only=False)
-        model.load_state_dict(ckpt["model_state_dict"])
-        model.eval()
-        pred_ab = model(L_batch)
-        preds_per_model.append(lab_normalized_to_rgb(L_batch, pred_ab))
+    columns = [gray] + predictions + [ground_truth]
+    titles = ["Grayscale (L)"] + labels + ["Ground Truth"]
 
-    n_cols = 2 + len(config_paths)
-    col_titles = ["Grayscale (L)"] + labels + ["Ground Truth"]
-
-    fig, axes = plt.subplots(num_samples, n_cols, figsize=(3.2 * n_cols, 3.0 * num_samples))
-    for r in range(num_samples):
-        axes[r, 0].imshow(gray_rgb[r], cmap="gray", vmin=0, vmax=1)
-        for m_idx, pred_rgb in enumerate(preds_per_model):
-            axes[r, 1 + m_idx].imshow(pred_rgb[r])
-        axes[r, -1].imshow(gt_rgb[r])
-
-        for c in range(n_cols):
-            axes[r, c].axis("off")
-            if r == 0:
-                axes[r, c].set_title(col_titles[c], fontsize=11, fontweight="bold")
+    fig, axes = plt.subplots(num_samples, len(columns), figsize=(3.2 * len(columns), 3.0 * num_samples))
+    for row in range(num_samples):
+        for col, images in enumerate(columns):
+            ax = axes[row, col]
+            if col == 0:
+                ax.imshow(images[row], cmap="gray", vmin=0, vmax=1)
+            else:
+                ax.imshow(images[row])
+            ax.axis("off")
+            if row == 0:
+                ax.set_title(titles[col], fontsize=11, fontweight="bold")
 
     plt.suptitle("Qualitative Test-Set Colorization Comparison", fontsize=14, y=0.995)
     plt.tight_layout()
@@ -145,26 +162,19 @@ def plot_visual_comparison(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate comparison plots & visual grids.")
+    parser = argparse.ArgumentParser(description="Generate comparison plots and a visual grid.")
     parser.add_argument("--configs", nargs="+", type=Path, required=True)
-    parser.add_argument("--labels", nargs="+", type=str, default=None)
+    parser.add_argument("--labels", nargs="+", type=str, default=None, help="Display names, one per config.")
     parser.add_argument("--num-samples", type=int, default=6)
     args = parser.parse_args()
 
-    exp_names = []
-    for p in args.configs:
-        with open(p, "r", encoding="utf-8") as f:
-            exp_names.append(yaml.safe_load(f)["experiment_name"])
-
+    exp_names = [load_yaml(p)["experiment_name"] for p in args.configs]
     labels = args.labels if args.labels and len(args.labels) == len(exp_names) else exp_names
 
-    plot_curves(exp_names, labels, Path("results/history"), Path("results/plots"))
-    plot_visual_comparison(
-        args.configs,
-        labels,
-        Path("results/samples/comparison_grid.png"),
-        num_samples=args.num_samples,
-    )
+    PLOT_DIR.mkdir(parents=True, exist_ok=True)
+    plot_loss_curves(exp_names, labels)
+    plot_metric_curves(exp_names, labels)
+    plot_visual_comparison(args.configs, labels, GRID_PATH, num_samples=args.num_samples)
 
 
 if __name__ == "__main__":

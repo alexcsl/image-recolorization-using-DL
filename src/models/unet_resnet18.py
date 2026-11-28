@@ -1,3 +1,10 @@
+"""
+Selected Method 1: U-Net with an ImageNet-pretrained ResNet-18 encoder.
+
+- The pretrained encoder already recognizes objects (sky, grass, faces), which helps pick plausible colors.
+- Skip connections pass encoder features at every resolution straight to the decoder, so object edges stay sharp.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

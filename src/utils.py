@@ -1,3 +1,14 @@
+"""
+Shared helpers: reproducibility, CIELAB conversion, and parameter counting.
+
+Why CIELAB?
+    CIELAB separates brightness from color. L (lightness, 0..100) is exactly the grayscale photo,
+    so it is the model input. a (green-red) and b (blue-yellow), roughly -128..127, hold the color,
+    so they are the model target. Both are scaled to [-1, 1]:
+        L_norm  = L / 50 - 1
+        ab_norm = ab / 128
+"""
+
 import random
 from typing import Tuple
 

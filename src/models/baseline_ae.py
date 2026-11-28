@@ -1,3 +1,11 @@
+"""
+Baseline: a plain convolutional encoder-decoder.
+
+The encoder compresses 256x256 down to 8x8 and the decoder expands it back, with no skip connections
+and no pretrained weights. Fine details are lost in the bottleneck and the MSE loss favors the
+average color, so the output tends to look faded. This is the lower bound the other methods must beat.
+"""
+
 import torch
 import torch.nn as nn
 

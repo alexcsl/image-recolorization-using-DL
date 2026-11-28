@@ -8,7 +8,29 @@ Automatic image colorization predicts plausible, natural colors for grayscale ph
 - **Input**: Lightness channel `L` (`1 × 256 × 256`, normalized to `[-1, 1]`)
 - **Target**: Chrominance channels `a, b` (`2 × 256 × 256`, normalized to `[-1, 1]`)
 - **Dataset**: **12,000** color images sampled deterministically (`seed=42`) from **MS COCO 2017 (`train2017`)** after filtering out natively grayscale/monochrome images, split **80% Train (9,600) / 10% Val (1,200) / 10% Test (1,200)**.
-- **Metrics**: **PSNR** (↑), **SSIM** (↑), and **LPIPS** (↓).
+- **Metrics**: **PSNR** (↑), **SSIM** (↑), **LPIPS** (↓), and **FID** (↓).
+  - PSNR, SSIM, and LPIPS compare each colorized image with its original and are averaged over images.
+  - FID (Fréchet Inception Distance) compares the distribution of all colorized test images with the distribution of the real ones, using Inception-v3 features from the standard `pytorch-fid` implementation. It rewards colors that look realistic even when they differ from the original. FID is only meaningful over many images, so it is computed once on the full test set (`test_fid`) and not on the validation subsets during training. With 1,200 images it is higher than FID reported on 50,000-image benchmarks, so compare it only between runs of this project.
+  - Runs finished before FID was added can get it without retraining: `python -m src.train --config <config> --eval-only` re-evaluates the best checkpoint and rewrites that run's row.
+
+## Proposed Methods (Proposal rev01)
+
+| Role | Method | Status |
+| --- | --- | --- |
+| Baseline | Simple CNN Autoencoder, MSE loss | `baseline_ae` |
+| Method 1 | U-Net with ImageNet-pretrained ResNet-18 encoder, L1 loss | `unet_resnet18` |
+| Method 2 | Pix2Pix (U-Net generator + PatchGAN discriminator, adversarial + L1 loss) | Not implemented yet |
+| Method 3 | Palette conditional diffusion model, L2 noise loss, DDIM sampling | `palette` |
+
+Proposal rev01 replaces Colorful Image Colorization (Zhang et al.) with Palette as Method 3 and adds Scenario 6 (DDIM sampling steps 50, 100, 250).
+
+### Palette (Method 3)
+`src/models/palette.py` frames colorization as iterative denoising of the `ab` channels conditioned on `L`:
+- **Denoiser**: U-Net with residual blocks, sinusoidal timestep embedding, and self-attention at 32×32 and in the bottleneck. Input is `[L, noisy ab]` (3 channels) and output is the predicted noise (2 channels).
+- **Training**: 1,000-step linear noise schedule (`β` 1e-4 to 0.02). A random timestep is sampled per image and the model minimizes the L2 loss between true and predicted noise. An EMA copy of the weights (`ema_decay: 0.999`) is used for validation, checkpoints, and testing.
+- **Inference**: deterministic DDIM sampling (`ddim_eta: 0`) from Gaussian noise. `sampling_steps` sets the number of steps and defaults to 50.
+- **Color space**: The original paper uses RGB. This project keeps CIELAB so the input lightness is preserved exactly and the data pipeline matches the other models.
+- **Validation**: `val_loss` is the denoising loss with a fixed seed, so epochs are comparable. Validation PSNR, SSIM, and LPIPS use DDIM sampling on the first `val_metric_samples` (256) images to keep training time bounded. Test metrics, including FID, always use the full test set.
 
 ---
 
@@ -20,12 +42,14 @@ Automatic image colorization predicts plausible, natural colors for grayscale ph
 │   ├── e1_lr_1e3.yaml              # E1: Learning rate ablation (lr=1e-3)
 │   ├── e2_unet_resnet18.yaml       # E2: U-Net + Pretrained ResNet-18 Encoder (L1 loss)
 │   ├── e3_unet_weight_decay.yaml   # E3: E2 with weight decay 1e-4
-│   └── e4_unet_bs32.yaml           # E4 (Ready): U-Net ResNet-18 with batch_size=32
+│   ├── e4_unet_bs32.yaml           # E4 (Ready): U-Net ResNet-18 with batch_size=32
+│   └── m3_palette.yaml             # Method 3: Palette conditional diffusion (L2 noise loss, DDIM 50 steps)
 ├── data/
 │   └── splits/                     # Committed reproducible manifests (train/val/test.csv)
 ├── notebooks/
 │   ├── 01_eda_and_data_prep.ipynb          # EDA, preprocessing & split verification
-│   └── 02_baseline_and_experiments.ipynb   # Model training, curves & qualitative eval
+│   ├── 02_baseline_and_experiments.ipynb   # Model training, curves & qualitative eval
+│   └── 03_palette_colab.ipynb              # Google Colab: train Palette + Scenario 6 (Drive-backed, resumable)
 ├── results/
 │   ├── history/                    # Per-epoch CSV logs & per-run JSON summaries
 │   ├── plots/                      # EDA charts, train/val loss & metric curves
@@ -35,10 +59,11 @@ Automatic image colorization predicts plausible, natural colors for grayscale ph
 │   └── prepare_dataset.py          # Reproducible COCO 2017 downloader & splitter
 ├── src/
 │   ├── dataset.py                  # CIELAB PyTorch Dataset + horizontal flip augmentation
-│   ├── metrics.py                  # PSNR, SSIM, LPIPS evaluator
+│   ├── metrics.py                  # PSNR, SSIM, LPIPS, FID evaluator
 │   ├── models/
 │   │   ├── baseline_ae.py          # Simple CNN Autoencoder (no skip, no pretrained)
-│   │   └── unet_resnet18.py        # U-Net with ImageNet-pretrained ResNet-18 encoder
+│   │   ├── unet_resnet18.py        # U-Net with ImageNet-pretrained ResNet-18 encoder
+│   │   └── palette.py              # Palette: attention U-Net denoiser + DDIM sampler
 │   ├── train.py                    # Unified training + best-checkpoint test evaluation
 │   ├── evaluate.py                 # Curve plots + qualitative comparison grid generator
 │   └── utils.py                    # Seeding, CIELAB<->RGB transforms, param counter
@@ -85,6 +110,15 @@ Use the published manifests for comparable runs. An unavailable image during ini
 python -m src.train --config configs/baseline.yaml
 python -m src.train --config configs/e1_lr_1e3.yaml
 python -m src.train --config configs/e2_unet_resnet18.yaml
+python -m src.train --config configs/m3_palette.yaml
+```
+
+Each epoch also writes `checkpoints/<experiment>_last.pt`. Add `--resume` to continue an interrupted run from it. To run Palette on Google Colab, open `notebooks/03_palette_colab.ipynb`; it stores the dataset, checkpoints, and results on Google Drive.
+
+Scenario 6 reuses the trained Palette checkpoint and changes only the number of DDIM sampling steps at test time. Each run adds a row such as `m3_palette_ddim100` to `results/metrics_summary.csv`, including `test_time_sec`:
+```bash
+python -m src.train --config configs/m3_palette.yaml --eval-only --sampling-steps 100
+python -m src.train --config configs/m3_palette.yaml --eval-only --sampling-steps 250
 ```
 
 ### 4. Regenerate Comparison Plots & Visual Grids
@@ -103,6 +137,8 @@ python -m src.evaluate --configs configs/baseline.yaml configs/e1_lr_1e3.yaml co
 | E2 | Baseline | Pretrained ResNet-18 U-Net and L1 loss | Benchmark the proposed method as a package |
 | E3 | E2 | Weight decay 0.0001 | Measure the effect of L2 regularization in Adam |
 | E4 | E2 | Batch size 32 | Measure the effect of averaging gradients over more images |
+| M3 | Baseline | Palette conditional diffusion, L2 noise loss, DDIM 50 steps | Benchmark Method 3 |
+| E6 | M3 | DDIM sampling steps 100 and 250 (test-time only) | Measure the quality and speed trade-off of the sampler |
 
 All runs use the same train, validation, and test manifests. The three single-variable experiments are E1, E3, and E4. E2 is a combined benchmark and cannot isolate the effect of its architecture or loss.
 

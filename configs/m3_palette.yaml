@@ -1,0 +1,36 @@
+experiment_name: m3_palette
+description: "Selected Method 3: Palette conditional diffusion model (attention U-Net predicts noise on ab conditioned on L, L2 loss, DDIM sampling)"
+seed: 42
+
+data:
+  processed_dir: data/processed_256
+  splits_dir: data/splits
+  image_size: 256
+  num_workers: 4
+  val_metric_samples: 256
+
+model:
+  name: palette
+  image_size: 256
+  timesteps: 1000
+  beta_start: 1.0e-4
+  beta_end: 0.02
+  sampling_steps: 50
+  ddim_eta: 0.0
+  base_channels: 64
+  channel_mults: [1, 2, 4, 4]
+  num_res_blocks: 2
+  attention_resolutions: [32]
+  num_heads: 4
+  dropout: 0.1
+
+training:
+  epochs: 30
+  batch_size: 16
+  optimizer: adam
+  lr: 2.0e-4
+  weight_decay: 0.0
+  loss: l2
+  ema_decay: 0.999
+  use_amp: true
+  num_visual_samples: 8
